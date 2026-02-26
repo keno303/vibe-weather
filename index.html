@@ -454,6 +454,12 @@ body::after {
 .ticker-item .t-score.negative { color: var(--accent); }
 .ticker-item .t-score.neutral { color: var(--text-dim); }
 
+.ticker-item {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
 .ticker-item .t-title {
   font-family: var(--sans);
   font-size: 0.8rem;
@@ -461,9 +467,8 @@ body::after {
   color: var(--text);
   line-height: 1.4;
   padding-right: 20px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .ticker-item .t-source {
@@ -805,11 +810,11 @@ function render(data) {
     const scoreClass = item.score > 0 ? 'positive' : item.score < 0 ? 'negative' : 'neutral';
     const scoreStr = (item.score > 0 ? '+' : '') + item.score;
     return `
-      <div class="ticker-item">
+      <a class="ticker-item" href="${item.url}" target="_blank" rel="noopener">
         <span class="t-score ${scoreClass}">${scoreStr}</span>
         <span class="t-title">${item.title}</span>
         <span class="t-source">${item.source}</span>
-      </div>
+      </a>
     `;
   }).join('');
 
