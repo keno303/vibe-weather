@@ -5,330 +5,602 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vibe Weather — Internet Mood Forecast</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
   --temp: 20;
-  --hue-warm: 35;
-  --hue-cold: 220;
+  --accent: #FF3D00;
+  --accent-dim: #FF3D0066;
+  --surface: #111;
+  --surface-2: #1a1a1a;
+  --surface-3: #222;
+  --text: #E8E6E3;
+  --text-dim: #666;
+  --text-muted: #444;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --sans: 'Space Grotesk', -apple-system, sans-serif;
+  --border: #2a2a2a;
 }
+
+html { background: #0a0a0a; }
 
 body {
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family: var(--sans);
   min-height: 100vh;
   overflow-x: hidden;
-  transition: background 1.5s ease;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  color: var(--text);
+  background: #0a0a0a;
 }
 
-/* Dynamic gradient background */
-.bg-layer {
+/* ===== GRAIN OVERLAY ===== */
+body::after {
+  content: '';
   position: fixed;
   inset: 0;
-  z-index: -2;
-  transition: background 2s ease;
-}
-
-/* Particle canvas */
-#particles {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
+  z-index: 9999;
   pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
-/* Loading screen */
+/* ===== WEATHER ATMOSPHERE ===== */
+#atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  transition: opacity 2s ease;
+}
+
+/* Warm glow for sunny state */
+.weather-sunny #atmosphere {
+  background: radial-gradient(ellipse 80% 60% at 20% 30%, rgba(255,61,0,0.08) 0%, transparent 70%),
+              radial-gradient(ellipse 60% 80% at 80% 70%, rgba(255,170,0,0.05) 0%, transparent 70%);
+}
+
+.weather-storm #atmosphere {
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, rgba(100,50,255,0.06) 0%, transparent 70%);
+}
+
+/* Rain canvas */
+#rainCanvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+
+.weather-rain #rainCanvas,
+.weather-storm #rainCanvas { opacity: 1; }
+
+/* Storm shake */
+@keyframes stormShake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2px, 1px); }
+  30% { transform: translate(2px, -1px); }
+  50% { transform: translate(-1px, 2px); }
+  70% { transform: translate(1px, -2px); }
+  90% { transform: translate(-2px, 0); }
+}
+
+.weather-storm .main-grid {
+  animation: stormShake 0.5s ease-in-out infinite;
+}
+
+/* Lightning flash */
+@keyframes lightning {
+  0%, 95%, 100% { opacity: 0; }
+  96%, 98% { opacity: 0.15; }
+  97% { opacity: 0; }
+}
+
+.weather-storm::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: white;
+  z-index: 2;
+  pointer-events: none;
+  animation: lightning 4s ease-in-out infinite;
+}
+
+/* ===== LOADING SCREEN ===== */
 .loading {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  min-height: 100vh;
-  gap: 24px;
+  padding: 10vw;
+  z-index: 100;
+  background: #0a0a0a;
 }
 
 .loading h2 {
-  font-size: 1.4rem;
-  font-weight: 500;
-  opacity: 0.9;
+  font-family: var(--sans);
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+
+.loading-bar-track {
+  width: min(400px, 60vw);
+  height: 2px;
+  background: var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  position: absolute;
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  animation: loadSlide 1.2s ease-in-out infinite;
+}
+
+@keyframes loadSlide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+.loading-sub {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 20px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ===== MAIN GRID LAYOUT ===== */
+.main-grid {
+  display: none;
+  position: relative;
+  z-index: 5;
+  min-height: 100vh;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "header  header"
+    "temp    sidebar"
+    "ticker  ticker";
+  gap: 0;
+}
+
+.main-grid.visible {
+  display: grid;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.main-grid.visible {
+  animation: fadeIn 1s ease;
+}
+
+/* ===== HEADER BAR ===== */
+.header-bar {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.header-bar .brand {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-bar .brand::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.header-bar .live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #00ff88;
+  border-radius: 50%;
+  margin-right: 6px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ===== TEMPERATURE ZONE ===== */
+.temp-zone {
+  grid-area: temp;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 40px;
+  border-right: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.temp-zone .weather-icon-display {
+  font-size: 48px;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.temp-zone .temp-value {
+  font-family: var(--sans);
+  font-size: clamp(160px, 20vw, 280px);
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  line-height: 0.85;
+  color: var(--text);
+  position: relative;
+}
+
+.temp-zone .temp-unit {
+  font-family: var(--mono);
+  font-size: clamp(24px, 3vw, 40px);
+  font-weight: 300;
+  color: var(--text-dim);
+  vertical-align: super;
   letter-spacing: -0.02em;
 }
 
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 3px solid rgba(255,255,255,0.2);
-  border-top-color: rgba(255,255,255,0.9);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.temp-zone .temp-label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  margin-top: 24px;
+  font-weight: 500;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.loading-sub {
-  font-size: 0.9rem;
-  opacity: 0.6;
+.temp-zone .temp-desc {
+  font-family: var(--sans);
+  font-size: 1rem;
+  color: var(--text-dim);
+  margin-top: 8px;
+  font-weight: 300;
   max-width: 300px;
-  text-align: center;
   line-height: 1.5;
 }
 
-/* Main container */
-.container {
-  max-width: 520px;
-  width: 100%;
-  padding: 40px 24px 60px;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-  animation: fadeUp 1s ease;
-}
-
-.container.visible {
+/* ===== SIDEBAR (MOOD AXES) ===== */
+.sidebar {
+  grid-area: sidebar;
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 40px;
 }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+.sidebar-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  margin-bottom: 32px;
 }
 
-/* Header */
-.header {
-  text-align: center;
+/* Editorial infographic axes */
+.mood-axes {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
 }
 
-.header h1 {
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  margin-bottom: 4px;
-}
-
-.header .subtitle {
-  font-size: 0.85rem;
-  opacity: 0.7;
-  font-weight: 400;
-}
-
-/* Main temp display */
-.temp-display {
-  text-align: center;
+.mood-axis {
   position: relative;
 }
 
-.weather-icon {
-  font-size: 80px;
-  line-height: 1;
-  margin-bottom: 8px;
-  filter: drop-shadow(0 4px 20px rgba(0,0,0,0.2));
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-.temperature {
-  font-size: 96px;
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  line-height: 1;
-  text-shadow: 0 4px 30px rgba(0,0,0,0.15);
-}
-
-.temp-unit {
-  font-size: 40px;
-  font-weight: 300;
-  opacity: 0.7;
-  vertical-align: super;
-}
-
-.temp-label {
-  font-size: 1.1rem;
-  font-weight: 500;
-  opacity: 0.85;
-  margin-top: 8px;
-  letter-spacing: -0.01em;
-}
-
-/* Glass card */
-.glass {
-  background: rgba(255,255,255,0.12);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 20px;
-  padding: 24px;
-  width: 100%;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-}
-
-/* Mood axes */
-.axes {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.axis {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.axis-labels {
+.mood-axis-header {
   display: flex;
   justify-content: space-between;
-  font-size: 0.78rem;
-  font-weight: 500;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.mood-axis-name {
+  font-family: var(--mono);
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.8;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
 }
 
-.axis-bar {
-  height: 8px;
-  background: rgba(255,255,255,0.15);
-  border-radius: 4px;
-  overflow: hidden;
+.mood-axis-value {
+  font-family: var(--sans);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1;
+}
+
+.mood-axis-track {
+  width: 100%;
+  height: 2px;
+  background: var(--border);
   position: relative;
 }
 
-.axis-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
-  position: relative;
-}
-
-.axis-fill::after {
-  content: '';
+.mood-axis-fill {
   position: absolute;
-  right: 0;
-  top: -3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  left: 0;
+  top: 0;
+  height: 100%;
+  transition: width 2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.axis-fill.happy { background: linear-gradient(90deg, #f7971e, #ffd200); }
-.axis-fill.peaceful { background: linear-gradient(90deg, #56ab2f, #a8e063); }
-.axis-fill.optimistic { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+.mood-axis-fill.ax-happy { background: var(--accent); }
+.mood-axis-fill.ax-peaceful { background: #00ff88; }
+.mood-axis-fill.ax-optimistic { background: #4D9FFF; }
 
-/* Sources card */
-.sources-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.7;
-  margin-bottom: 16px;
+.mood-axis-marker {
+  position: absolute;
+  top: -5px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid;
+  background: #0a0a0a;
+  transform: translateX(-50%);
+  transition: left 2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.source-item {
+.mood-axis-marker.ax-happy { border-color: var(--accent); }
+.mood-axis-marker.ax-peaceful { border-color: #00ff88; }
+.mood-axis-marker.ax-optimistic { border-color: #4D9FFF; }
+
+.mood-axis-range {
   display: flex;
-  align-items: flex-start;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+/* ===== TICKER / SOURCES ===== */
+.ticker-zone {
+  grid-area: ticker;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.ticker-header {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 16px 40px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
 }
 
-.source-item:last-child { border-bottom: none; }
-
-.source-emoji {
-  font-size: 1.3rem;
-  flex-shrink: 0;
-  margin-top: 2px;
+.ticker-header .ticker-tag {
+  background: var(--accent);
+  color: #000;
+  padding: 2px 8px;
+  font-weight: 700;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
 }
 
-.source-text {
+.ticker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+}
+
+.ticker-item {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px;
+  align-items: center;
+  padding: 14px 40px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-family: var(--mono);
+  transition: background 0.2s ease;
+  cursor: default;
+}
+
+.ticker-item:hover {
+  background: var(--surface-2);
+}
+
+.ticker-item .t-score {
   font-size: 0.85rem;
-  line-height: 1.5;
-  opacity: 0.9;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.source-score {
-  font-size: 0.75rem;
-  opacity: 0.5;
-  margin-top: 2px;
+.ticker-item .t-score.positive { color: #00ff88; }
+.ticker-item .t-score.negative { color: var(--accent); }
+.ticker-item .t-score.neutral { color: var(--text-dim); }
+
+.ticker-item .t-title {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.4;
+  padding-right: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Footer */
-.footer {
-  text-align: center;
-  font-size: 0.75rem;
-  opacity: 0.4;
-  padding-bottom: 20px;
+.ticker-item .t-source {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  text-align: right;
 }
 
-/* Responsive */
+/* ===== FOOTER ===== */
+.footer-bar {
+  padding: 16px 40px;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "temp"
+      "sidebar"
+      "ticker";
+  }
+
+  .temp-zone {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 40px 24px;
+  }
+
+  .sidebar {
+    padding: 40px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-bar { padding: 16px 24px; }
+
+  .ticker-list { grid-template-columns: 1fr; }
+
+  .ticker-item { padding: 12px 24px; }
+
+  .ticker-header { padding: 12px 24px; }
+
+  .footer-bar { padding: 12px 24px; flex-direction: column; gap: 4px; }
+}
+
 @media (max-width: 480px) {
-  .temperature { font-size: 72px; }
-  .temp-unit { font-size: 28px; }
-  .weather-icon { font-size: 60px; }
-  .container { padding: 30px 16px 40px; }
+  .temp-zone .temp-value { font-size: 120px; }
+  .ticker-item { grid-template-columns: 50px 1fr 60px; }
 }
 </style>
 </head>
 <body>
 
-<div class="bg-layer" id="bgLayer"></div>
-<canvas id="particles"></canvas>
+<div id="atmosphere"></div>
+<canvas id="rainCanvas"></canvas>
 
 <!-- Loading -->
 <div class="loading" id="loading">
-  <div class="spinner"></div>
-  <h2>Reading the internet's mood...</h2>
-  <div class="loading-sub">Scanning Hacker News, Reddit, and more for today's vibe</div>
+  <h2>Reading the<br>internet's mood</h2>
+  <div class="loading-bar-track"><div class="loading-bar-fill"></div></div>
+  <div class="loading-sub">Scanning Hacker News, Reddit, and more</div>
 </div>
 
 <!-- Main content -->
-<div class="container" id="main">
-  <div class="header">
-    <h1>☁️ Vibe Weather</h1>
-    <div class="subtitle">Internet Mood Forecast</div>
+<div class="main-grid" id="main">
+  <div class="header-bar">
+    <div class="brand">VIBE WEATHER</div>
+    <div><span class="live-dot"></span>LIVE SENTIMENT</div>
   </div>
 
-  <div class="temp-display">
-    <div class="weather-icon" id="weatherIcon">☀️</div>
-    <div class="temperature"><span id="tempValue">--</span><span class="temp-unit">°V</span></div>
-    <div class="temp-label" id="tempLabel">Analyzing...</div>
+  <div class="temp-zone">
+    <div class="weather-icon-display" id="weatherIcon"></div>
+    <div class="temp-value"><span id="tempValue">--</span><span class="temp-unit">&#176;V</span></div>
+    <div class="temp-label" id="tempLabel">ANALYZING</div>
+    <div class="temp-desc" id="tempDesc">Aggregating sentiment from live internet sources</div>
   </div>
 
-  <div class="glass">
-    <div class="axes">
-      <div class="axis">
-        <div class="axis-labels"><span>😢 Sad</span><span>😊 Happy</span></div>
-        <div class="axis-bar"><div class="axis-fill happy" id="axisHappy" style="width:50%"></div></div>
+  <div class="sidebar">
+    <div class="sidebar-label">Mood Indices</div>
+    <div class="mood-axes">
+      <div class="mood-axis">
+        <div class="mood-axis-header">
+          <span class="mood-axis-name">Happiness</span>
+          <span class="mood-axis-value" id="axisHappyVal">--</span>
+        </div>
+        <div class="mood-axis-track">
+          <div class="mood-axis-fill ax-happy" id="axisHappy" style="width:0%"></div>
+          <div class="mood-axis-marker ax-happy" id="axisHappyMarker" style="left:0%"></div>
+        </div>
+        <div class="mood-axis-range"><span>Despondent</span><span>Euphoric</span></div>
       </div>
-      <div class="axis">
-        <div class="axis-labels"><span>😠 Angry</span><span>☮️ Peaceful</span></div>
-        <div class="axis-bar"><div class="axis-fill peaceful" id="axisPeaceful" style="width:50%"></div></div>
+      <div class="mood-axis">
+        <div class="mood-axis-header">
+          <span class="mood-axis-name">Peace Index</span>
+          <span class="mood-axis-value" id="axisPeacefulVal">--</span>
+        </div>
+        <div class="mood-axis-track">
+          <div class="mood-axis-fill ax-peaceful" id="axisPeaceful" style="width:0%"></div>
+          <div class="mood-axis-marker ax-peaceful" id="axisPeacefulMarker" style="left:0%"></div>
+        </div>
+        <div class="mood-axis-range"><span>Hostile</span><span>Serene</span></div>
       </div>
-      <div class="axis">
-        <div class="axis-labels"><span>😰 Pessimistic</span><span>🌟 Optimistic</span></div>
-        <div class="axis-bar"><div class="axis-fill optimistic" id="axisOptimistic" style="width:50%"></div></div>
+      <div class="mood-axis">
+        <div class="mood-axis-header">
+          <span class="mood-axis-name">Outlook</span>
+          <span class="mood-axis-value" id="axisOptimisticVal">--</span>
+        </div>
+        <div class="mood-axis-track">
+          <div class="mood-axis-fill ax-optimistic" id="axisOptimistic" style="width:0%"></div>
+          <div class="mood-axis-marker ax-optimistic" id="axisOptimisticMarker" style="left:0%"></div>
+        </div>
+        <div class="mood-axis-range"><span>Nihilistic</span><span>Visionary</span></div>
       </div>
     </div>
   </div>
 
-  <div class="glass" id="sourcesCard">
-    <div class="sources-title">Top Vibes Right Now</div>
-    <div id="sourcesList"></div>
-  </div>
-
-  <div class="footer">
-    Vibe Weather · Sentiment from live internet data · Not actual weather 😉
+  <div class="ticker-zone">
+    <div class="ticker-header">
+      <span class="ticker-tag">FEED</span>
+      <span>Top sentiment signals</span>
+    </div>
+    <div class="ticker-list" id="sourcesList"></div>
+    <div class="footer-bar">
+      <span>Vibe Weather &mdash; Sentiment from live internet data</span>
+      <span>Not actual weather</span>
+    </div>
   </div>
 </div>
 
@@ -395,11 +667,11 @@ function scoreSentiment(text) {
 }
 
 function sentimentEmoji(score) {
-  if (score > 2) return '☀️';
-  if (score > 0.5) return '🌤️';
-  if (score > -0.5) return '🌥️';
-  if (score > -2) return '🌧️';
-  return '⛈️';
+  if (score > 2) return '\u2600\uFE0F';
+  if (score > 0.5) return '\uD83C\uDF24\uFE0F';
+  if (score > -0.5) return '\uD83C\uDF25\uFE0F';
+  if (score > -2) return '\uD83C\uDF27\uFE0F';
+  return '\u26C8\uFE0F';
 }
 
 // ============================================
@@ -476,7 +748,7 @@ function analyze(items) {
   const peaceful = Math.min(100, Math.max(0, 50 + (totalPeaceful - totalAngry) / n * 25));
   const optimistic = Math.min(100, Math.max(0, 50 + (totalOptimistic - totalPessimistic) / n * 25));
 
-  // Temperature: map sentiment to 5-35°C range
+  // Temperature: map sentiment to 5-35\u00B0C range
   const temp = Math.round(5 + (happy / 100) * 30);
 
   // Sort by absolute score for "top vibes"
@@ -486,110 +758,149 @@ function analyze(items) {
 }
 
 function getWeatherState(temp) {
-  if (temp >= 28) return { icon: '☀️', label: 'Radiant Vibes', bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #fda085 100%)' };
-  if (temp >= 23) return { icon: '🌤️', label: 'Good Vibes', bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' };
-  if (temp >= 18) return { icon: '⛅', label: 'Mixed Signals', bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' };
-  if (temp >= 13) return { icon: '🌥️', label: 'Cloudy Mood', bg: 'linear-gradient(135deg, #485563 0%, #29323c 100%)' };
-  if (temp >= 8)  return { icon: '🌧️', label: 'Gloomy Internet', bg: 'linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)' };
-  return { icon: '⛈️', label: 'Internet Rage Storm', bg: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' };
+  if (temp >= 28) return { icon: '\u2600\uFE0F', label: 'Radiant Vibes', desc: 'The internet is radiating warmth. Rare optimism detected across all channels.', weather: 'sunny' };
+  if (temp >= 23) return { icon: '\uD83C\uDF24\uFE0F', label: 'Good Vibes', desc: 'Positive sentiment dominates. The digital commons are feeling generous today.', weather: 'clear' };
+  if (temp >= 18) return { icon: '\u26C5', label: 'Mixed Signals', desc: 'Neither good nor bad. The internet is processing. Typical discourse patterns.', weather: 'mixed' };
+  if (temp >= 13) return { icon: '\uD83C\uDF25\uFE0F', label: 'Cloudy Mood', desc: 'Skepticism and concern are gaining traction. Guard your attention.', weather: 'cloudy' };
+  if (temp >= 8)  return { icon: '\uD83C\uDF27\uFE0F', label: 'Gloomy Internet', desc: 'Negativity saturates the feeds. Cynicism prevails. Touch grass.', weather: 'rain' };
+  return { icon: '\u26C8\uFE0F', label: 'Internet Rage Storm', desc: 'Maximum hostility detected. All channels are on fire. Close your tabs.', weather: 'storm' };
 }
 
 function render(data) {
   const state = getWeatherState(data.temp);
 
-  document.getElementById('bgLayer').style.background = state.bg;
+  // Set weather class on body for atmospheric effects
+  document.body.className = `weather-${state.weather}`;
+
   document.getElementById('weatherIcon').textContent = state.icon;
   document.getElementById('tempValue').textContent = data.temp;
   document.getElementById('tempLabel').textContent = state.label;
+  document.getElementById('tempDesc').textContent = state.desc;
+
+  // Update accent color based on temp
+  if (data.temp >= 23) {
+    document.documentElement.style.setProperty('--accent', '#FF6B00');
+  } else if (data.temp < 13) {
+    document.documentElement.style.setProperty('--accent', '#4D9FFF');
+  }
 
   // Animate axes
   setTimeout(() => {
     document.getElementById('axisHappy').style.width = data.happy + '%';
+    document.getElementById('axisHappyMarker').style.left = data.happy + '%';
+    document.getElementById('axisHappyVal').textContent = Math.round(data.happy);
+
     document.getElementById('axisPeaceful').style.width = data.peaceful + '%';
+    document.getElementById('axisPeacefulMarker').style.left = data.peaceful + '%';
+    document.getElementById('axisPeacefulVal').textContent = Math.round(data.peaceful);
+
     document.getElementById('axisOptimistic').style.width = data.optimistic + '%';
+    document.getElementById('axisOptimisticMarker').style.left = data.optimistic + '%';
+    document.getElementById('axisOptimisticVal').textContent = Math.round(data.optimistic);
   }, 300);
 
-  // Top items
+  // Top items — Bloomberg terminal style
   const list = document.getElementById('sourcesList');
-  list.innerHTML = data.topItems.map(item => `
-    <div class="source-item">
-      <span class="source-emoji">${item.emoji}</span>
-      <div>
-        <div class="source-text">${item.title}</div>
-        <div class="source-score">${item.source} · Score: ${item.score > 0 ? '+' : ''}${item.score}</div>
+  list.innerHTML = data.topItems.map(item => {
+    const scoreClass = item.score > 0 ? 'positive' : item.score < 0 ? 'negative' : 'neutral';
+    const scoreStr = (item.score > 0 ? '+' : '') + item.score;
+    return `
+      <div class="ticker-item">
+        <span class="t-score ${scoreClass}">${scoreStr}</span>
+        <span class="t-title">${item.title}</span>
+        <span class="t-source">${item.source}</span>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   // Show
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main').classList.add('visible');
 
-  // Particles
-  initParticles(data.temp);
+  // Weather effects
+  initWeatherEffects(data.temp, state.weather);
 }
 
 // ============================================
-// PARTICLE SYSTEM
+// WEATHER EFFECTS SYSTEM
 // ============================================
 
-function initParticles(temp) {
-  const canvas = document.getElementById('particles');
+function initWeatherEffects(temp, weather) {
+  const canvas = document.getElementById('rainCanvas');
   const ctx = canvas.getContext('2d');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-
-  const particles = [];
-  const count = temp < 15 ? 120 : temp < 22 ? 40 : 25;
-
-  for (let i = 0; i < count; i++) {
-    particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * (temp < 15 ? 2 : 0.5),
-      vy: temp < 15 ? Math.random() * 3 + 1 : (Math.random() - 0.5) * 0.3,
-      size: Math.random() * (temp < 15 ? 3 : 4) + 1,
-      opacity: Math.random() * 0.4 + 0.1,
-      // Rain drops for bad vibes, floating dots for good
-      isRain: temp < 15
-    });
-  }
-
-  function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (const p of particles) {
-      p.x += p.vx;
-      p.y += p.vy;
-
-      if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
-      if (p.x > canvas.width) p.x = 0;
-      if (p.x < 0) p.x = canvas.width;
-      if (p.y < 0 && !p.isRain) p.y = canvas.height;
-
-      ctx.beginPath();
-      if (p.isRain) {
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x + p.vx * 2, p.y + 8);
-        ctx.strokeStyle = `rgba(255,255,255,${p.opacity})`;
-        ctx.lineWidth = p.size * 0.5;
-        ctx.stroke();
-      } else {
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
-        ctx.fill();
-      }
-    }
-
-    requestAnimationFrame(animate);
-  }
-
-  animate();
 
   window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   });
+
+  if (weather === 'rain' || weather === 'storm') {
+    const drops = [];
+    const count = weather === 'storm' ? 300 : 150;
+
+    for (let i = 0; i < count; i++) {
+      drops.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        len: Math.random() * 20 + 10,
+        speed: Math.random() * 8 + 8,
+        opacity: Math.random() * 0.3 + 0.1,
+        wind: weather === 'storm' ? Math.random() * 4 + 2 : 1
+      });
+    }
+
+    function animateRain() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const d of drops) {
+        d.y += d.speed;
+        d.x += d.wind;
+        if (d.y > canvas.height) { d.y = -d.len; d.x = Math.random() * canvas.width; }
+        if (d.x > canvas.width) d.x = 0;
+
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y);
+        ctx.lineTo(d.x + d.wind * 0.5, d.y + d.len);
+        ctx.strokeStyle = `rgba(180, 200, 230, ${d.opacity})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      requestAnimationFrame(animateRain);
+    }
+    animateRain();
+  } else if (weather === 'sunny' || weather === 'clear') {
+    // Floating warm particles
+    const particles = [];
+    const count = 30;
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2 + 0.5,
+        speedY: -(Math.random() * 0.3 + 0.1),
+        speedX: (Math.random() - 0.5) * 0.3,
+        opacity: Math.random() * 0.15 + 0.05
+      });
+    }
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of particles) {
+        p.y += p.speedY;
+        p.x += p.speedX;
+        if (p.y < -10) { p.y = canvas.height + 10; p.x = Math.random() * canvas.width; }
+        if (p.x > canvas.width) p.x = 0;
+        if (p.x < 0) p.x = canvas.width;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 180, 100, ${p.opacity})`;
+        ctx.fill();
+      }
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+  }
 }
 
 // ============================================
@@ -597,16 +908,13 @@ function initParticles(temp) {
 // ============================================
 
 (async function main() {
-  // Set initial gradient
-  document.getElementById('bgLayer').style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-
   const [hn, reddit] = await Promise.all([fetchHN(), fetchRedditViaJson()]);
   const allItems = [...hn, ...reddit];
 
   if (allItems.length === 0) {
-    document.querySelector('.loading h2').textContent = 'Could not reach any sources 😢';
-    document.querySelector('.loading-sub').textContent = 'CORS might be blocking requests. Try hosting locally or via a proxy.';
-    document.querySelector('.spinner').style.display = 'none';
+    document.querySelector('.loading h2').textContent = 'Could not reach any sources';
+    document.querySelector('.loading-sub').textContent = 'CORS MIGHT BE BLOCKING REQUESTS. TRY HOSTING LOCALLY OR VIA A PROXY.';
+    document.querySelector('.loading-bar-track').style.display = 'none';
     return;
   }
 
