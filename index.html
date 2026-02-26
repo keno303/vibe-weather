@@ -174,6 +174,7 @@ body::after {
   grid-template-areas:
     "header  header"
     "temp    sidebar"
+    "quotes  quotes"
     "ticker  ticker";
   gap: 0;
 }
@@ -394,16 +395,89 @@ body::after {
   color: var(--text-muted);
 }
 
+/* ===== QUOTES OF THE DAY ===== */
+.quotes-zone {
+  grid-area: quotes;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+}
+
+.quote-card {
+  background: var(--surface);
+  padding: 28px 32px;
+}
+
+.quote-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  opacity: 0.6;
+}
+
+.quote-text {
+  display: block;
+  font-family: var(--sans);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.quote-text:hover { color: var(--accent); }
+
+.quote-positive .quote-text { border-left: 2px solid #00ff88; padding-left: 14px; }
+.quote-negative .quote-text { border-left: 2px solid var(--accent); padding-left: 14px; }
+
+.quote-source {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin-top: 10px;
+  letter-spacing: 0.05em;
+}
+
+/* ===== FILTER BUTTONS ===== */
+.filter-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-btn {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+.ticker-item.hidden { display: none; }
+
 /* ===== TICKER / SOURCES ===== */
 .ticker-zone {
   grid-area: ticker;
-  border-top: 1px solid var(--border);
   overflow: hidden;
 }
 
 .ticker-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 16px 40px;
   border-bottom: 1px solid var(--border);
@@ -500,6 +574,7 @@ body::after {
       "header"
       "temp"
       "sidebar"
+      "quotes"
       "ticker";
   }
 
@@ -523,6 +598,8 @@ body::after {
   .ticker-header { padding: 12px 24px; }
 
   .footer-bar { padding: 12px 24px; flex-direction: column; gap: 4px; }
+  .quotes-zone { grid-template-columns: 1fr; }
+  .ticker-header { flex-direction: column; gap: 8px; }
 }
 
 @media (max-width: 480px) {
@@ -596,10 +673,31 @@ body::after {
     </div>
   </div>
 
+  <!-- QUOTES OF THE DAY -->
+  <div class="quotes-zone">
+    <div class="quote-card quote-positive">
+      <div class="quote-label">☀️ BEST VIBE</div>
+      <a class="quote-text" id="quotePositive" href="#" target="_blank" rel="noopener">"—"</a>
+      <div class="quote-source" id="quotePositiveSource"></div>
+    </div>
+    <div class="quote-card quote-negative">
+      <div class="quote-label">⛈️ WORST VIBE</div>
+      <a class="quote-text" id="quoteNegative" href="#" target="_blank" rel="noopener">"—"</a>
+      <div class="quote-source" id="quoteNegativeSource"></div>
+    </div>
+  </div>
+
   <div class="ticker-zone">
     <div class="ticker-header">
-      <span class="ticker-tag">FEED</span>
-      <span>Top sentiment signals</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="ticker-tag">FEED</span>
+        <span>Top sentiment signals</span>
+      </div>
+      <div class="filter-buttons">
+        <button class="filter-btn active" data-filter="all">ALL</button>
+        <button class="filter-btn" data-filter="positive">☀️ GOOD</button>
+        <button class="filter-btn" data-filter="negative">⛈️ BAD</button>
+      </div>
     </div>
     <div class="ticker-list" id="sourcesList"></div>
     <div class="footer-bar">
@@ -817,6 +915,37 @@ function render(data) {
       </a>
     `;
   }).join('');
+
+  // Quotes of the day
+  const sortedByScore = [...data.topItems].sort((a, b) => b.score - a.score);
+  const bestVibe = sortedByScore[0];
+  const worstVibe = sortedByScore[sortedByScore.length - 1];
+
+  if (bestVibe) {
+    document.getElementById('quotePositive').textContent = `"${bestVibe.title}"`;
+    document.getElementById('quotePositive').href = bestVibe.url;
+    document.getElementById('quotePositiveSource').textContent = `${bestVibe.source} · Score: +${bestVibe.score}`;
+  }
+  if (worstVibe) {
+    document.getElementById('quoteNegative').textContent = `"${worstVibe.title}"`;
+    document.getElementById('quoteNegative').href = worstVibe.url;
+    document.getElementById('quoteNegativeSource').textContent = `${worstVibe.source} · Score: ${worstVibe.score}`;
+  }
+
+  // Filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const filter = btn.dataset.filter;
+      document.querySelectorAll('.ticker-item').forEach(item => {
+        const score = item.querySelector('.t-score');
+        if (filter === 'all') { item.classList.remove('hidden'); }
+        else if (filter === 'positive') { item.classList.toggle('hidden', score.classList.contains('negative') || score.classList.contains('neutral')); }
+        else if (filter === 'negative') { item.classList.toggle('hidden', score.classList.contains('positive') || score.classList.contains('neutral')); }
+      });
+    });
+  });
 
   // Show
   document.getElementById('loading').style.display = 'none';
