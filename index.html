@@ -694,7 +694,7 @@ async function fetchHN() {
     return stories.filter(s => s && s.title).map(s => ({
       title: s.title,
       text: s.title + (s.text ? ' ' + s.text : ''),
-      url: s.url || `https://news.ycombinator.com/item?id=${s.id}`,
+      url: `https://news.ycombinator.com/item?id=${s.id}`,
       source: 'Hacker News'
     }));
   } catch (e) {
@@ -759,7 +759,7 @@ function analyze(items) {
   // Sort by absolute score for "top vibes"
   scored.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
 
-  return { temp, happy, peaceful, optimistic, topItems: scored.slice(0, 8) };
+  return { temp, happy, peaceful, optimistic, topItems: scored.slice(0, 15) };
 }
 
 function getWeatherState(temp) {
