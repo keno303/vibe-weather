@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Weather — Internet Mood Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --temp: 20;
+  --hue-warm: 35;
+  --hue-cold: 220;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 1.5s ease;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Dynamic gradient background */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  transition: background 2s ease;
+}
+
+/* Particle canvas */
+#particles {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Loading screen */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 24px;
+}
+
+.loading h2 {
+  font-size: 1.4rem;
+  font-weight: 500;
+  opacity: 0.9;
+  letter-spacing: -0.02em;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: rgba(255,255,255,0.9);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-sub {
+  font-size: 0.9rem;
+  opacity: 0.6;
+  max-width: 300px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Main container */
+.container {
+  max-width: 520px;
+  width: 100%;
+  padding: 40px 24px 60px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  animation: fadeUp 1s ease;
+}
+
+.container.visible {
+  display: flex;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.header {
+  text-align: center;
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+
+.header .subtitle {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+/* Main temp display */
+.temp-display {
+  text-align: center;
+  position: relative;
+}
+
+.weather-icon {
+  font-size: 80px;
+  line-height: 1;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 4px 20px rgba(0,0,0,0.2));
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.temperature {
+  font-size: 96px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  text-shadow: 0 4px 30px rgba(0,0,0,0.15);
+}
+
+.temp-unit {
+  font-size: 40px;
+  font-weight: 300;
+  opacity: 0.7;
+  vertical-align: super;
+}
+
+.temp-label {
+  font-size: 1.1rem;
+  font-weight: 500;
+  opacity: 0.85;
+  margin-top: 8px;
+  letter-spacing: -0.01em;
+}
+
+/* Glass card */
+.glass {
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+/* Mood axes */
+.axes {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.axis {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.axis-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.axis-bar {
+  height: 8px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.axis-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+
+.axis-fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.axis-fill.happy { background: linear-gradient(90deg, #f7971e, #ffd200); }
+.axis-fill.peaceful { background: linear-gradient(90deg, #56ab2f, #a8e063); }
+.axis-fill.optimistic { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+
+/* Sources card */
+.sources-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+  margin-bottom: 16px;
+}
+
+.source-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.source-item:last-child { border-bottom: none; }
+
+.source-emoji {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.source-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.source-score {
+  font-size: 0.75rem;
+  opacity: 0.5;
+  margin-top: 2px;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.4;
+  padding-bottom: 20px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .temperature { font-size: 72px; }
+  .temp-unit { font-size: 28px; }
+  .weather-icon { font-size: 60px; }
+  .container { padding: 30px 16px 40px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-layer" id="bgLayer"></div>
+<canvas id="particles"></canvas>
+
+<!-- Loading -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <h2>Reading the internet's mood...</h2>
+  <div class="loading-sub">Scanning Hacker News, Reddit, and more for today's vibe</div>
+</div>
+
+<!-- Main content -->
+<div class="container" id="main">
+  <div class="header">
+    <h1>☁️ Vibe Weather</h1>
+    <div class="subtitle">Internet Mood Forecast</div>
+  </div>
+
+  <div class="temp-display">
+    <div class="weather-icon" id="weatherIcon">☀️</div>
+    <div class="temperature"><span id="tempValue">--</span><span class="temp-unit">°V</span></div>
+    <div class="temp-label" id="tempLabel">Analyzing...</div>
+  </div>
+
+  <div class="glass">
+    <div class="axes">
+      <div class="axis">
+        <div class="axis-labels"><span>😢 Sad</span><span>😊 Happy</span></div>
+        <div class="axis-bar"><div class="axis-fill happy" id="axisHappy" style="width:50%"></div></div>
+      </div>
+      <div class="axis">
+        <div class="axis-labels"><span>😠 Angry</span><span>☮️ Peaceful</span></div>
+        <div class="axis-bar"><div class="axis-fill peaceful" id="axisPeaceful" style="width:50%"></div></div>
+      </div>
+      <div class="axis">
+        <div class="axis-labels"><span>😰 Pessimistic</span><span>🌟 Optimistic</span></div>
+        <div class="axis-bar"><div class="axis-fill optimistic" id="axisOptimistic" style="width:50%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="glass" id="sourcesCard">
+    <div class="sources-title">Top Vibes Right Now</div>
+    <div id="sourcesList"></div>
+  </div>
+
+  <div class="footer">
+    Vibe Weather · Sentiment from live internet data · Not actual weather 😉
+  </div>
+</div>
+
+<script>
+// ============================================
+// SENTIMENT LEXICON (AFINN-inspired + custom)
+// ============================================
+const POSITIVE = {
+  'amazing':3,'awesome':3,'beautiful':3,'best':3,'brilliant':3,'celebrate':2,
+  'cool':2,'excellent':3,'exciting':3,'fantastic':3,'free':1,'fun':2,'good':2,
+  'great':3,'happy':3,'helpful':2,'hope':2,'impressive':2,'incredible':3,
+  'innovation':2,'inspiring':3,'interesting':2,'joy':3,'launch':1,'love':3,
+  'nice':2,'new':1,'open':1,'opportunity':2,'optimistic':3,'perfect':3,
+  'positive':2,'powerful':2,'progress':2,'proud':2,'release':1,'remarkable':3,
+  'revolutionary':3,'secure':2,'simple':1,'smart':2,'solve':2,'success':3,
+  'super':2,'support':1,'sweet':2,'thank':2,'top':1,'upgrade':2,'useful':2,
+  'win':2,'wonderful':3,'wow':3,'yes':1,'breakthrough':3,'fast':2,'better':2,
+  'improve':2,'growing':2,'welcome':1,'peaceful':2,'calm':2,'kind':2,
+  'generous':2,'delight':3,'thrive':2,'achieve':2,'empower':2,'reward':2,
+  'grateful':3,'blessed':2,'excited':3
+};
+
+const NEGATIVE = {
+  'abuse':3,'angry':3,'annoying':2,'attack':3,'awful':3,'bad':2,'ban':2,
+  'bankrupt':3,'block':2,'boring':2,'broken':2,'bug':2,'burn':2,'cancel':2,
+  'catastrophe':3,'chaos':3,'collapse':3,'complain':2,'concern':1,'conflict':2,
+  'corrupt':3,'crash':3,'crisis':3,'critical':2,'cruel':3,'damage':3,'danger':3,
+  'dead':3,'death':3,'debt':2,'decline':2,'defeat':2,'destroy':3,'die':3,
+  'disaster':3,'discrimination':3,'doom':3,'dumb':2,'error':2,'evil':3,
+  'exploit':3,'fail':3,'fear':3,'fight':2,'fire':2,'fraud':3,'frustrat':2,
+  'fuck':3,'hate':3,'hell':2,'horrible':3,'hurt':3,'idiot':3,'illegal':3,
+  'insane':2,'issue':1,'jail':2,'kill':3,'lack':1,'lag':2,'lame':2,'lawsuit':2,
+  'lie':3,'lose':2,'loss':2,'lost':2,'mess':2,'miserable':3,'mistake':2,
+  'murder':3,'nasty':3,'negative':2,'nightmare':3,'outage':2,'outrage':3,
+  'pain':2,'panic':3,'pathetic':3,'penalty':2,'poison':3,'poor':2,'problem':2,
+  'protest':2,'rage':3,'reject':2,'risk':1,'sad':2,'scam':3,'scare':2,
+  'shame':3,'shit':3,'shock':2,'sick':2,'slow':1,'spam':2,'steal':3,'stop':1,
+  'stress':2,'struggle':2,'stupid':3,'suck':3,'suffer':3,'terrible':3,
+  'threat':3,'toxic':3,'tragic':3,'trouble':2,'ugly':2,'unfair':3,'upset':2,
+  'victim':2,'violence':3,'virus':2,'vulnerable':2,'war':3,'warn':2,
+  'waste':2,'weak':2,'weapon':3,'worry':2,'worst':3,'wrong':2,'wtf':3
+};
+
+// Axis-specific words
+const ANGRY_WORDS = ['angry','rage','outrage','fury','furious','hate','attack','fight','war','protest','riot','violence','abuse','hostile','aggression','wtf','fuck'];
+const PEACEFUL_WORDS = ['peace','peaceful','calm','gentle','harmony','kind','quiet','serene','mindful','meditate','relax','tranquil','zen','chill','ease'];
+const OPTIMISTIC_WORDS = ['hope','future','progress','innovation','opportunity','growth','build','improve','better','dream','vision','advance','forward','promising','breakthrough'];
+const PESSIMISTIC_WORDS = ['doom','collapse','decline','end','fear','hopeless','crisis','catastrophe','dystopia','bleak','grim','dark','fail','impossible','doomed'];
+
+function scoreSentiment(text) {
+  const words = text.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/);
+  let pos = 0, neg = 0, angry = 0, peaceful = 0, optimistic = 0, pessimistic = 0;
+
+  for (const w of words) {
+    if (POSITIVE[w]) pos += POSITIVE[w];
+    if (NEGATIVE[w]) neg += NEGATIVE[w];
+    if (ANGRY_WORDS.includes(w)) angry++;
+    if (PEACEFUL_WORDS.includes(w)) peaceful++;
+    if (OPTIMISTIC_WORDS.includes(w)) optimistic++;
+    if (PESSIMISTIC_WORDS.includes(w)) pessimistic++;
+  }
+
+  return { pos, neg, angry, peaceful, optimistic, pessimistic, total: words.length };
+}
+
+function sentimentEmoji(score) {
+  if (score > 2) return '☀️';
+  if (score > 0.5) return '🌤️';
+  if (score > -0.5) return '🌥️';
+  if (score > -2) return '🌧️';
+  return '⛈️';
+}
+
+// ============================================
+// DATA FETCHING
+// ============================================
+
+async function fetchHN() {
+  try {
+    const res = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
+    const ids = await res.json();
+    const top30 = ids.slice(0, 30);
+    const stories = await Promise.all(
+      top30.map(id => fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json()))
+    );
+    return stories.filter(s => s && s.title).map(s => ({
+      title: s.title,
+      text: s.title + (s.text ? ' ' + s.text : ''),
+      url: s.url || `https://news.ycombinator.com/item?id=${s.id}`,
+      source: 'Hacker News'
+    }));
+  } catch (e) {
+    console.warn('HN fetch failed:', e);
+    return [];
+  }
+}
+
+async function fetchRedditViaJson() {
+  try {
+    // Reddit's .json endpoint sometimes works without CORS issues
+    const res = await fetch('https://www.reddit.com/r/all/hot.json?limit=25', {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('Reddit blocked');
+    const data = await res.json();
+    return data.data.children.map(c => ({
+      title: c.data.title,
+      text: c.data.title + ' ' + (c.data.selftext || ''),
+      url: `https://reddit.com${c.data.permalink}`,
+      source: 'Reddit'
+    }));
+  } catch (e) {
+    console.warn('Reddit fetch failed (CORS):', e);
+    return [];
+  }
+}
+
+// ============================================
+// ANALYSIS & RENDERING
+// ============================================
+
+function analyze(items) {
+  let totalPos = 0, totalNeg = 0;
+  let totalAngry = 0, totalPeaceful = 0;
+  let totalOptimistic = 0, totalPessimistic = 0;
+  const scored = [];
+
+  for (const item of items) {
+    const s = scoreSentiment(item.text);
+    const net = s.pos - s.neg;
+    totalPos += s.pos;
+    totalNeg += s.neg;
+    totalAngry += s.angry;
+    totalPeaceful += s.peaceful;
+    totalOptimistic += s.optimistic;
+    totalPessimistic += s.pessimistic;
+    scored.push({ ...item, score: net, emoji: sentimentEmoji(net) });
+  }
+
+  const n = items.length || 1;
+  const netSentiment = (totalPos - totalNeg) / n;
+
+  // Normalize to 0-100 scale
+  const happy = Math.min(100, Math.max(0, 50 + netSentiment * 8));
+  const peaceful = Math.min(100, Math.max(0, 50 + (totalPeaceful - totalAngry) / n * 25));
+  const optimistic = Math.min(100, Math.max(0, 50 + (totalOptimistic - totalPessimistic) / n * 25));
+
+  // Temperature: map sentiment to 5-35°C range
+  const temp = Math.round(5 + (happy / 100) * 30);
+
+  // Sort by absolute score for "top vibes"
+  scored.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+
+  return { temp, happy, peaceful, optimistic, topItems: scored.slice(0, 8) };
+}
+
+function getWeatherState(temp) {
+  if (temp >= 28) return { icon: '☀️', label: 'Radiant Vibes', bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #fda085 100%)' };
+  if (temp >= 23) return { icon: '🌤️', label: 'Good Vibes', bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' };
+  if (temp >= 18) return { icon: '⛅', label: 'Mixed Signals', bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' };
+  if (temp >= 13) return { icon: '🌥️', label: 'Cloudy Mood', bg: 'linear-gradient(135deg, #485563 0%, #29323c 100%)' };
+  if (temp >= 8)  return { icon: '🌧️', label: 'Gloomy Internet', bg: 'linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)' };
+  return { icon: '⛈️', label: 'Internet Rage Storm', bg: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' };
+}
+
+function render(data) {
+  const state = getWeatherState(data.temp);
+
+  document.getElementById('bgLayer').style.background = state.bg;
+  document.getElementById('weatherIcon').textContent = state.icon;
+  document.getElementById('tempValue').textContent = data.temp;
+  document.getElementById('tempLabel').textContent = state.label;
+
+  // Animate axes
+  setTimeout(() => {
+    document.getElementById('axisHappy').style.width = data.happy + '%';
+    document.getElementById('axisPeaceful').style.width = data.peaceful + '%';
+    document.getElementById('axisOptimistic').style.width = data.optimistic + '%';
+  }, 300);
+
+  // Top items
+  const list = document.getElementById('sourcesList');
+  list.innerHTML = data.topItems.map(item => `
+    <div class="source-item">
+      <span class="source-emoji">${item.emoji}</span>
+      <div>
+        <div class="source-text">${item.title}</div>
+        <div class="source-score">${item.source} · Score: ${item.score > 0 ? '+' : ''}${item.score}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Show
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').classList.add('visible');
+
+  // Particles
+  initParticles(data.temp);
+}
+
+// ============================================
+// PARTICLE SYSTEM
+// ============================================
+
+function initParticles(temp) {
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = [];
+  const count = temp < 15 ? 120 : temp < 22 ? 40 : 25;
+
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * (temp < 15 ? 2 : 0.5),
+      vy: temp < 15 ? Math.random() * 3 + 1 : (Math.random() - 0.5) * 0.3,
+      size: Math.random() * (temp < 15 ? 3 : 4) + 1,
+      opacity: Math.random() * 0.4 + 0.1,
+      // Rain drops for bad vibes, floating dots for good
+      isRain: temp < 15
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+
+      if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+      if (p.x > canvas.width) p.x = 0;
+      if (p.x < 0) p.x = canvas.width;
+      if (p.y < 0 && !p.isRain) p.y = canvas.height;
+
+      ctx.beginPath();
+      if (p.isRain) {
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + p.vx * 2, p.y + 8);
+        ctx.strokeStyle = `rgba(255,255,255,${p.opacity})`;
+        ctx.lineWidth = p.size * 0.5;
+        ctx.stroke();
+      } else {
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+        ctx.fill();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  });
+}
+
+// ============================================
+// MAIN
+// ============================================
+
+(async function main() {
+  // Set initial gradient
+  document.getElementById('bgLayer').style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+
+  const [hn, reddit] = await Promise.all([fetchHN(), fetchRedditViaJson()]);
+  const allItems = [...hn, ...reddit];
+
+  if (allItems.length === 0) {
+    document.querySelector('.loading h2').textContent = 'Could not reach any sources 😢';
+    document.querySelector('.loading-sub').textContent = 'CORS might be blocking requests. Try hosting locally or via a proxy.';
+    document.querySelector('.spinner').style.display = 'none';
+    return;
+  }
+
+  const data = analyze(allItems);
+  render(data);
+})();
+</script>
+</body>
+</html>
